@@ -606,9 +606,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ### Made with 🌳 for nature enthusiasts and developers
 
-[![Stars](https://img.shields.io/github/stars/yourusername/Sylva?style=social)](https://github.com/yourusername/Sylva)
-[![Forks](https://img.shields.io/github/forks/yourusername/Sylva?style=social)](https://github.com/yourusername/Sylva)
-[![Issues](https://img.shields.io/github/issues/yourusername/Sylva?style=social)](https://github.com/yourusername/Sylva/issues)
 
 </div>
 
