@@ -54,7 +54,8 @@ fun GalleryUploadScreen(
                 UploadDropZone(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
+                        .weight(1f),
+                    onClick = onPickImage
                 )
                 OutlinedButton(
                     onClick = onPickImage,

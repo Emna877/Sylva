@@ -345,9 +345,11 @@ val apiKey = "sk-1234567890abcdef"
 POST /api/v3/identification
 Content-Type: multipart/form-data
 
-Parameters:
+Headers:
+- Api-Key: Your API key
+
+Multipart fields:
 - images: Image file (JPEG/PNG)
-- api_key: Your API key
 
 Response:
 {
@@ -369,6 +371,8 @@ Response:
     }
   ]
 }
+
+Note: the app scans all returned `results` entries and uses the highest-probability suggestion it finds.
 ```
 
 ### Gemini API Integration

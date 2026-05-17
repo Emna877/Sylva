@@ -1,22 +1,30 @@
 package com.example.sylva.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.sylva.ui.model.SampleTreeData
+import com.example.sylva.R
 import com.example.sylva.ui.model.TreeProfile
 import com.example.sylva.ui.navigation.SylvaDestination
 import com.example.sylva.ui.screens.CameraScreen
@@ -26,17 +34,55 @@ import com.example.sylva.ui.screens.HomeScreen
 import com.example.sylva.ui.screens.LoadingAnalysisScreen
 import com.example.sylva.ui.screens.SplashOnboardingScreen
 import com.example.sylva.ui.screens.TreeDetailsScreen
-import kotlinx.coroutines.delay
+import com.example.sylva.viewmodel.TreeAnalysisUiState
+import com.example.sylva.viewmodel.TreeAnalysisViewModel
+import java.io.ByteArrayOutputStream
 
 @Composable
 fun SylvaApp(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    analysisViewModel: TreeAnalysisViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val uiState by analysisViewModel.uiState.collectAsState()
+
     var currentTree by remember { mutableStateOf<TreeProfile?>(null) }
+    var currentErrorMessage by remember { mutableStateOf<String?>(null) }
     val savedTrees = remember { mutableStateListOf<TreeProfile>() }
     var hasGalleryImage by remember { mutableStateOf(false) }
-    var analysisError by remember { mutableStateOf(false) }
+    var selectedImageBytes by remember { mutableStateOf<ByteArray?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        val imageBytes = bitmap?.toJpegBytes()
+        if (imageBytes != null) {
+            selectedImageBytes = imageBytes
+            analysisViewModel.analyzeImage(imageBytes)
+            navController.navigate(SylvaDestination.Loading.route)
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                selectedImageBytes = stream.readBytes()
+                hasGalleryImage = true
+            }
+        }
+    }
+
+    LaunchedEffect(uiState) {
+        if (uiState is TreeAnalysisUiState.Success) {
+            currentTree = (uiState as TreeAnalysisUiState.Success).profile
+            currentErrorMessage = null
+        } else if (uiState is TreeAnalysisUiState.Error) {
+            currentErrorMessage = (uiState as TreeAnalysisUiState.Error).message
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -67,22 +113,16 @@ fun SylvaApp(
                     onUploadClick = { navController.navigate(SylvaDestination.Gallery.route) },
                     onHistoryClick = { navController.navigate(SylvaDestination.History.route) },
                     onRetry = {
-                        currentTree = SampleTreeData.oakProfile
-                        if (!savedTrees.contains(SampleTreeData.oakProfile)) {
-                            savedTrees.add(0, SampleTreeData.oakProfile)
-                        }
+                        analysisViewModel.analyzeImage(loadLeafBytes(context))
+                        navController.navigate(SylvaDestination.Loading.route)
                     },
-                    modifier = Modifier
-                        .fillMaxSize()
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 
             composable(SylvaDestination.Camera.route) {
                 CameraScreen(
-                    onCapture = {
-                        analysisError = false
-                        navController.navigate(SylvaDestination.Loading.route)
-                    },
+                    onCapture = { cameraLauncher.launch(null) },
                     onBack = { navController.popBackStack() },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -91,9 +131,10 @@ fun SylvaApp(
             composable(SylvaDestination.Gallery.route) {
                 GalleryUploadScreen(
                     hasImage = hasGalleryImage,
-                    onPickImage = { hasGalleryImage = true },
+                    onPickImage = { galleryLauncher.launch("image/*") },
                     onAnalyze = {
-                        analysisError = false
+                        val imageBytes = selectedImageBytes ?: loadLeafBytes(context)
+                        analysisViewModel.analyzeImage(imageBytes)
                         navController.navigate(SylvaDestination.Loading.route)
                     },
                     onBack = { navController.popBackStack() },
@@ -102,16 +143,18 @@ fun SylvaApp(
             }
 
             composable(SylvaDestination.Loading.route) {
-                LaunchedEffect(Unit) {
-                    delay(1600)
-                    currentTree = SampleTreeData.oakProfile
-                    if (!savedTrees.contains(SampleTreeData.oakProfile)) {
-                        savedTrees.add(0, SampleTreeData.oakProfile)
-                    }
-                    navController.navigate(SylvaDestination.TreeDetails.route) {
-                        popUpTo(SylvaDestination.Loading.route) { inclusive = true }
+                LaunchedEffect(uiState) {
+                    when (uiState) {
+                        is TreeAnalysisUiState.Success,
+                        is TreeAnalysisUiState.Error -> {
+                            navController.navigate(SylvaDestination.TreeDetails.route) {
+                                popUpTo(SylvaDestination.Loading.route) { inclusive = true }
+                            }
+                        }
+                        else -> Unit
                     }
                 }
+
                 LoadingAnalysisScreen(
                     onBack = { navController.popBackStack() },
                     modifier = Modifier.fillMaxSize()
@@ -121,9 +164,10 @@ fun SylvaApp(
             composable(SylvaDestination.TreeDetails.route) {
                 TreeDetailsScreen(
                     profile = currentTree,
-                    isError = analysisError,
+                    isError = uiState is TreeAnalysisUiState.Error,
+                    errorMessage = currentErrorMessage,
                     onRetry = {
-                        analysisError = false
+                        analysisViewModel.retryLastAnalysis()
                         navController.navigate(SylvaDestination.Loading.route)
                     },
                     onBack = { navController.popBackStack() },
@@ -132,7 +176,7 @@ fun SylvaApp(
                             savedTrees.add(0, currentTree!!)
                         }
                     },
-                    onShare = { /* Share functionality */ },
+                    onShare = { },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -146,4 +190,16 @@ fun SylvaApp(
             }
         }
     }
+}
+
+private fun loadLeafBytes(context: Context): ByteArray {
+    val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.leaf)
+        ?: error("Leaf fallback image could not be loaded")
+    return bitmap.toJpegBytes()
+}
+
+private fun Bitmap.toJpegBytes(): ByteArray {
+    val out = ByteArrayOutputStream()
+    compress(Bitmap.CompressFormat.JPEG, 90, out)
+    return out.toByteArray()
 }

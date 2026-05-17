@@ -49,6 +49,7 @@ import kotlinx.coroutines.delay
 fun TreeDetailsScreen(
     profile: TreeProfile?,
     isError: Boolean,
+    errorMessage: String? = null,
     onRetry: () -> Unit,
     onBack: () -> Unit = {},
     onSave: () -> Unit = {},
@@ -64,7 +65,8 @@ fun TreeDetailsScreen(
         ) {
             ErrorStateSection(
                 title = "Tree analysis failed",
-                message = "We could not retrieve Plant.id or Gemini insights. Check network and try again.",
+                message = errorMessage
+                    ?: "We could not retrieve Plant.id or Gemini insights. Check network and try again.",
                 onRetry = onRetry
             )
         }
