@@ -24,8 +24,9 @@ fun GalleryUploadScreen(
     hasImage: Boolean,
     onPickImage: () -> Unit,
     onAnalyze: () -> Unit,
+    modifier: Modifier = Modifier,
+    imageBytes: ByteArray? = null,
     onBack: () -> Unit = {},
-    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier.fillMaxSize()
@@ -65,6 +66,7 @@ fun GalleryUploadScreen(
                 }
             } else {
                 RoundedImagePreview(
+                    imageBytes = imageBytes,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)

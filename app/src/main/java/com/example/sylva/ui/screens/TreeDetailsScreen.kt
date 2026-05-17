@@ -35,6 +35,7 @@ import com.example.sylva.ui.components.BackNavigationButton
 import com.example.sylva.ui.components.ConfidenceBadge
 import com.example.sylva.ui.components.ErrorStateSection
 import com.example.sylva.ui.components.InsightCard
+import com.example.sylva.ui.components.RoundedImagePreview
 import com.example.sylva.ui.components.SaveToJournalFAB
 import com.example.sylva.ui.components.ShareButton
 import com.example.sylva.ui.components.SpeciesChip
@@ -49,12 +50,13 @@ import kotlinx.coroutines.delay
 fun TreeDetailsScreen(
     profile: TreeProfile?,
     isError: Boolean,
+    modifier: Modifier = Modifier,
+    imageBytes: ByteArray? = null,
     errorMessage: String? = null,
     onRetry: () -> Unit,
     onBack: () -> Unit = {},
     onSave: () -> Unit = {},
     onShare: () -> Unit = {},
-    modifier: Modifier = Modifier
 ) {
     if (isError) {
         Column(
@@ -104,33 +106,44 @@ fun TreeDetailsScreen(
                 }
             }
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .background(
-                            brush = Brush.linearGradient(
-                                listOf(ForestDeep, ForestNight)
-                            ),
-                            shape = SylvaShapes.image
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.alpha(0.6f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Image,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Tree photo will appear here",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(start = SylvaSpacing.xs)
-                        )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    RoundedImagePreview(
+                        imageBytes = imageBytes,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                    )
+
+                    if (imageBytes == null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        listOf(ForestDeep, ForestNight)
+                                    ),
+                                    shape = SylvaShapes.image
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.alpha(0.6f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "Tree photo will appear here",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(start = SylvaSpacing.xs)
+                                )
+                            }
+                        }
                     }
                 }
             }

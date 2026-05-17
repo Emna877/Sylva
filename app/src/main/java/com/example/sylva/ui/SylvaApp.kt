@@ -50,7 +50,6 @@ fun SylvaApp(
     var currentTree by remember { mutableStateOf<TreeProfile?>(null) }
     var currentErrorMessage by remember { mutableStateOf<String?>(null) }
     val savedTrees = remember { mutableStateListOf<TreeProfile>() }
-    var hasGalleryImage by remember { mutableStateOf(false) }
     var selectedImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -70,7 +69,6 @@ fun SylvaApp(
         if (uri != null) {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 selectedImageBytes = stream.readBytes()
-                hasGalleryImage = true
             }
         }
     }
@@ -130,7 +128,8 @@ fun SylvaApp(
 
             composable(SylvaDestination.Gallery.route) {
                 GalleryUploadScreen(
-                    hasImage = hasGalleryImage,
+                    hasImage = selectedImageBytes != null,
+                    imageBytes = selectedImageBytes,
                     onPickImage = { galleryLauncher.launch("image/*") },
                     onAnalyze = {
                         val imageBytes = selectedImageBytes ?: loadLeafBytes(context)
@@ -164,6 +163,7 @@ fun SylvaApp(
             composable(SylvaDestination.TreeDetails.route) {
                 TreeDetailsScreen(
                     profile = currentTree,
+                    imageBytes = selectedImageBytes,
                     isError = uiState is TreeAnalysisUiState.Error,
                     errorMessage = currentErrorMessage,
                     onRetry = {
