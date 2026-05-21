@@ -1,6 +1,7 @@
 package com.example.sylva.ui.components
 
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -72,7 +73,30 @@ fun RoundedImagePreview(
 ) {
     val imageBitmap = remember(imageBytes) {
         imageBytes?.let { bytes ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            try {
+                // Try direct decode first
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (e: OutOfMemoryError) {
+                Log.w("RoundedImagePreview", "OOM decoding image, attempting downsample: ${e.message}")
+                // Fallback: decode with downsampling
+                try {
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    val maxDim = 2048
+                    var sampleSize = 1
+                    while (options.outWidth / sampleSize > maxDim || options.outHeight / sampleSize > maxDim) {
+                        sampleSize *= 2
+                    }
+                    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)?.asImageBitmap()
+                } catch (t: Throwable) {
+                    Log.w("RoundedImagePreview", "Failed to downsample decode: ${t.message}")
+                    null
+                }
+            } catch (t: Throwable) {
+                Log.w("RoundedImagePreview", "Failed to decode image: ${t.message}")
+                null
+            }
         }
     }
 

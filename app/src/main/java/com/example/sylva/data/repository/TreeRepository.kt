@@ -11,6 +11,7 @@ import com.example.sylva.ui.model.TreeProfile
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import android.util.Log
 
 data class InsightEnvelope(
     val nativeRegion: String = "Unknown",
@@ -39,17 +40,36 @@ class TreeRepository {
 
             // Send image as multipart/form-data to Plant.id
             val requestBody = imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+            // Plant.id expects images under the `images` multipart field name.
             val imagePart = MultipartBody.Part.createFormData("images", "image.jpg", requestBody)
+
+            // Debug: log that we're about to call Plant.id and the size of the image
+            Log.d("TreeRepository", "Calling Plant.id with image bytes=${imageBytes.size}")
             val plantResponse = plantIdService.identifyPlantMultipart(
                 apiKey = BuildConfig.PLANT_ID_API_KEY,
                 image = imagePart
             )
 
             // Plant.id can return multiple result entries; scan them all for the strongest match.
+            Log.d("TreeRepository", "Plant.id response results=${plantResponse.results.size}")
+            // Log a brief snapshot of the first suggestion if available to help debug mapping issues.
+            val firstSuggestion = plantResponse.results
+                .firstOrNull()
+                ?.classification
+                ?.suggestions
+                ?.firstOrNull()
+            if (firstSuggestion != null) {
+                // Use displayName which handles plant_name or legacy name fields.
+                val name = firstSuggestion.displayName
+                Log.d("TreeRepository", "First suggestion name=$name probability=${firstSuggestion.probability}")
+            } else {
+                Log.d("TreeRepository", "No suggestions found in Plant.id response")
+            }
+
             val topSuggestion = findTopPlantSuggestion(plantResponse)
                 ?: error("No species detected by Plant.id")
 
-            val speciesName = topSuggestion.name
+            val speciesName = topSuggestion.displayName
             val commonNames = topSuggestion.details?.commonNames.orEmpty()
             val confidence = topSuggestion.probability.toFloat().coerceIn(0f, 1f)
 

@@ -21,10 +21,19 @@ data class PlantIdClassification(
 )
 
 data class PlantSuggestion(
-    @SerializedName("name") val name: String = "Unknown species",
+    // Accept both `plant_name` (v3) and legacy `name` keys to be robust against variations.
+    @SerializedName("plant_name") val plantName: String? = null,
+    @SerializedName("name") val legacyName: String? = null,
     @SerializedName("probability") val probability: Double = 0.0,
-    @SerializedName("details") val details: PlantSuggestionDetails? = null
-)
+    @SerializedName("plant_details") val details: PlantSuggestionDetails? = null
+) {
+    val displayName: String
+        get() = when {
+            !plantName.isNullOrBlank() -> plantName
+            !legacyName.isNullOrBlank() -> legacyName
+            else -> "Unknown species"
+        }
+}
 
 data class PlantSuggestionDetails(
     @SerializedName("common_names") val commonNames: List<String> = emptyList()

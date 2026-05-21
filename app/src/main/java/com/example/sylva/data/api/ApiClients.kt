@@ -9,7 +9,9 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiClients {
 
     private val logger = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BASIC
+        // Use BODY level during development to see request/response payloads from Plant.id/Gemini.
+        // You can lower this to BASIC or NONE for release builds.
+        level = HttpLoggingInterceptor.Level.BODY
     }
 
     private val okHttpClient = OkHttpClient.Builder()
