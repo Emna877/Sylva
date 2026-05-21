@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.text.selection.SelectionContainer
 import com.example.sylva.ui.theme.SylvaShapes
 import com.example.sylva.ui.theme.SylvaSpacing
 
@@ -80,12 +81,15 @@ fun ErrorStateSection(
             tint = MaterialTheme.colorScheme.error
         )
         Text(text = title, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        SelectionContainer {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Start,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Button(onClick = onRetry) {
             Text(text = "Retry")
         }

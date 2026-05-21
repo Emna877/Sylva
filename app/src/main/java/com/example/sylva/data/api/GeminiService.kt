@@ -3,6 +3,7 @@ package com.example.sylva.data.api
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class GeminiRequest(
@@ -26,8 +27,9 @@ data class GeminiCandidate(
 )
 
 interface GeminiService {
-    @POST("v1beta/models/gemini-1.5-flash:generateContent")
+    @POST("v1beta/models/{model}:generateContent")
     suspend fun generateInsights(
+        @Path("model") model: String,
         @Query("key") apiKey: String,
         @Body request: GeminiRequest
     ): GeminiResponse

@@ -73,6 +73,19 @@ fun SylvaApp(
         }
     }
 
+    // Additional launcher that uses ACTION_OPEN_DOCUMENT / OpenDocument which can be
+    // useful on emulators to pick files from the host machine (Files -> select file).
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            // Grant temporary read permission and load bytes
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                selectedImageBytes = stream.readBytes()
+            }
+        }
+    }
+
     LaunchedEffect(uiState) {
         if (uiState is TreeAnalysisUiState.Success) {
             currentTree = (uiState as TreeAnalysisUiState.Success).profile
@@ -131,6 +144,7 @@ fun SylvaApp(
                     hasImage = selectedImageBytes != null,
                     imageBytes = selectedImageBytes,
                     onPickImage = { galleryLauncher.launch("image/*") },
+                    onPickImageFromPc = { openDocumentLauncher.launch(arrayOf("image/*")) },
                     onAnalyze = {
                         val imageBytes = selectedImageBytes ?: loadLeafBytes(context)
                         analysisViewModel.analyzeImage(imageBytes)

@@ -23,6 +23,7 @@ import com.example.sylva.ui.theme.SylvaSpacing
 fun GalleryUploadScreen(
     hasImage: Boolean,
     onPickImage: () -> Unit,
+    onPickImageFromPc: () -> Unit = {},
     onAnalyze: () -> Unit,
     modifier: Modifier = Modifier,
     imageBytes: ByteArray? = null,
@@ -63,6 +64,13 @@ fun GalleryUploadScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = "Select from gallery")
+                }
+                // Helpful for emulator testing: allow selecting files from the host/PC
+                OutlinedButton(
+                    onClick = onPickImageFromPc,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "Select from PC (emulator)")
                 }
             } else {
                 RoundedImagePreview(

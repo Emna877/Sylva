@@ -28,8 +28,8 @@ class ExampleUnitTest {
                 PlantIdResult(
                     classification = PlantIdClassification(
                         suggestions = listOf(
-                            PlantSuggestion(name = "Species A", probability = 0.55),
-                            PlantSuggestion(name = "Species B", probability = 0.91)
+                            PlantSuggestion(legacyName = "Species A", probability = 0.55),
+                            PlantSuggestion(legacyName = "Species B", probability = 0.91)
                         )
                     )
                 )
@@ -40,7 +40,7 @@ class ExampleUnitTest {
 
         assertNotNull(suggestion)
         val topSuggestion = suggestion!!
-        assertEquals("Species B", topSuggestion.name)
+        assertEquals("Species B", topSuggestion.displayName)
         assertEquals(0.91, topSuggestion.probability, 0.0001)
     }
 }

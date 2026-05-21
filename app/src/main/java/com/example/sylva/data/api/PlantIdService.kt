@@ -2,15 +2,20 @@ package com.example.sylva.data.api
 
 import com.google.gson.annotations.SerializedName
 import okhttp3.MultipartBody
-import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 
-// Plant.id response models (the API returns a `results` array).
+// Plant.id response models. The live API has used both `result` and `results`
+// shapes over time, so the model accepts both.
 data class PlantIdResponse(
-    @SerializedName("results") val results: List<PlantIdResult> = emptyList()
+    @SerializedName("results") val results: List<PlantIdResult> = emptyList(),
+    @SerializedName("result") val result: PlantIdResult? = null
 )
+
+fun PlantIdResponse.allResults(): List<PlantIdResult> {
+    return if (results.isNotEmpty()) results else result?.let { listOf(it) }.orEmpty()
+}
 
 data class PlantIdResult(
     @SerializedName("classification") val classification: PlantIdClassification? = null
@@ -21,11 +26,12 @@ data class PlantIdClassification(
 )
 
 data class PlantSuggestion(
-    // Accept both `plant_name` (v3) and legacy `name` keys to be robust against variations.
+    // Accept several name/detail field variants to be robust against Plant.id schema changes.
     @SerializedName("plant_name") val plantName: String? = null,
     @SerializedName("name") val legacyName: String? = null,
     @SerializedName("probability") val probability: Double = 0.0,
-    @SerializedName("plant_details") val details: PlantSuggestionDetails? = null
+    @SerializedName("details") val details: PlantSuggestionDetails? = null,
+    @SerializedName("plant_details") val plantDetails: PlantSuggestionDetails? = null
 ) {
     val displayName: String
         get() = when {
@@ -33,10 +39,14 @@ data class PlantSuggestion(
             !legacyName.isNullOrBlank() -> legacyName
             else -> "Unknown species"
         }
+
+    val resolvedDetails: PlantSuggestionDetails?
+        get() = details ?: plantDetails
 }
 
 data class PlantSuggestionDetails(
-    @SerializedName("common_names") val commonNames: List<String> = emptyList()
+    @SerializedName("common_names") val commonNames: List<String> = emptyList(),
+    @SerializedName("commonNames") val commonNamesCamel: List<String> = emptyList()
 )
 
 interface PlantIdService {
@@ -44,7 +54,6 @@ interface PlantIdService {
     @Multipart
     @POST("api/v3/identification")
     suspend fun identifyPlantMultipart(
-        @Header("Api-Key") apiKey: String,
         @Part image: MultipartBody.Part
     ): PlantIdResponse
 }

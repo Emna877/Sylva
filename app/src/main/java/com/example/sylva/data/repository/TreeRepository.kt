@@ -6,12 +6,15 @@ import com.example.sylva.data.api.ApiClients
 import com.example.sylva.data.api.GeminiContent
 import com.example.sylva.data.api.GeminiPart
 import com.example.sylva.data.api.GeminiRequest
+import com.example.sylva.data.api.allResults
 import com.example.sylva.ui.model.InsightItem
 import com.example.sylva.ui.model.TreeProfile
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import android.util.Log
+import retrofit2.HttpException
+import okhttp3.ResponseBody
 
 data class InsightEnvelope(
     val nativeRegion: String = "Unknown",
@@ -45,15 +48,27 @@ class TreeRepository {
 
             // Debug: log that we're about to call Plant.id and the size of the image
             Log.d("TreeRepository", "Calling Plant.id with image bytes=${imageBytes.size}")
-            val plantResponse = plantIdService.identifyPlantMultipart(
-                apiKey = BuildConfig.PLANT_ID_API_KEY,
-                image = imagePart
-            )
+            val plantResponse = try {
+                plantIdService.identifyPlantMultipart(imagePart)
+            } catch (e: HttpException) {
+                // Try to extract a helpful error body to make debugging easier for 4xx/5xx responses
+                val errorBody = try {
+                    e.response()?.errorBody()?.string().orEmpty()
+                } catch (t: Throwable) {
+                    "(failed to read error body: ${t.message})"
+                }
+                Log.e("TreeRepository", "Plant.id HttpException code=${e.code()} body=$errorBody")
+                throw RuntimeException("Plant.id request failed: HTTP ${e.code()} - $errorBody")
+            }
 
             // Plant.id can return multiple result entries; scan them all for the strongest match.
-            Log.d("TreeRepository", "Plant.id response results=${plantResponse.results.size}")
+            val plantResults = plantResponse.allResults()
+            Log.d(
+                "TreeRepository",
+                "Plant.id response results=${plantResponse.results.size}, resultPresent=${plantResponse.result != null}, normalizedResults=${plantResults.size}"
+            )
             // Log a brief snapshot of the first suggestion if available to help debug mapping issues.
-            val firstSuggestion = plantResponse.results
+            val firstSuggestion = plantResults
                 .firstOrNull()
                 ?.classification
                 ?.suggestions
@@ -67,10 +82,13 @@ class TreeRepository {
             }
 
             val topSuggestion = findTopPlantSuggestion(plantResponse)
-                ?: error("No species detected by Plant.id")
+                ?: error(
+                    "No species detected by Plant.id. The response contained ${plantResults.size} result(s) but no usable suggestions."
+                )
 
             val speciesName = topSuggestion.displayName
-            val commonNames = topSuggestion.details?.commonNames.orEmpty()
+            val commonNames = (topSuggestion.resolvedDetails?.commonNames.orEmpty() + topSuggestion.resolvedDetails?.commonNamesCamel.orEmpty())
+                .distinct()
             val confidence = topSuggestion.probability.toFloat().coerceIn(0f, 1f)
 
             val prompt = """
@@ -80,9 +98,9 @@ class TreeRepository {
                 Species: $speciesName
             """.trimIndent()
 
-            val geminiResponse = geminiService.generateInsights(
-                apiKey = BuildConfig.GEMINI_API_KEY,
-                request = GeminiRequest(contents = listOf(GeminiContent(parts = listOf(GeminiPart(prompt)))))
+            val geminiResponse = generateGeminiInsightsWithFallback(
+                prompt = prompt,
+                apiKey = BuildConfig.GEMINI_API_KEY
             )
 
             val geminiText = geminiResponse.candidates
@@ -143,8 +161,48 @@ class TreeRepository {
         )
     }
 
+    private suspend fun generateGeminiInsightsWithFallback(prompt: String, apiKey: String): com.example.sylva.data.api.GeminiResponse {
+        val request = GeminiRequest(contents = listOf(GeminiContent(parts = listOf(GeminiPart(prompt)))))
+        val candidateModels = listOf(
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        )
+
+        var lastError: Throwable? = null
+
+        for (model in candidateModels) {
+            try {
+                Log.d("TreeRepository", "Calling Gemini model=$model")
+                return geminiService.generateInsights(
+                    model = model,
+                    apiKey = apiKey,
+                    request = request
+                )
+            } catch (e: HttpException) {
+                val errorBody = try {
+                    e.response()?.errorBody()?.string().orEmpty()
+                } catch (t: Throwable) {
+                    "(failed to read error body: ${t.message})"
+                }
+                Log.e("TreeRepository", "Gemini HttpException model=$model code=${e.code()} body=$errorBody")
+                lastError = e
+                if (e.code() != 404) {
+                    throw RuntimeException("Gemini request failed for $model: HTTP ${e.code()} - $errorBody")
+                }
+            } catch (t: Throwable) {
+                Log.e("TreeRepository", "Gemini call failed model=$model: ${t.message}", t)
+                lastError = t
+            }
+        }
+
+        throw RuntimeException(
+            "Gemini request failed: no supported model responded successfully. Last error: ${lastError?.message ?: "unknown"}"
+        )
+    }
+
     internal fun findTopPlantSuggestion(response: com.example.sylva.data.api.PlantIdResponse): com.example.sylva.data.api.PlantSuggestion? {
-        return response.results
+        return response.allResults()
             .asSequence()
             .flatMap { it.classification?.suggestions.orEmpty().asSequence() }
             .maxByOrNull { it.probability }
